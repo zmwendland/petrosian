@@ -1,1 +1,5 @@
-
+pandas
+bs4
+streamlit
+requests
+geopy
