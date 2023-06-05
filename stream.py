@@ -1,170 +1,122 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 14 17:12:06 2023
+Created on Thu Jun  1 19:37:20 2023
 
 @author: zwendland001
 """
-
+import streamlit as st 
 import pandas as pd
-from bs4 import BeautifulSoup as bs
-import requests as r 
-import streamlit as st
-from geopy.geocoders import Nominatim
+from io import StringIO
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from time import sleep
+
 
 st.set_page_config(
     page_title="Petrosian App - Beta",
     page_icon="",
 )
 
+uploaded_file = st.file_uploader("Choose a file")
+if uploaded_file is not None:
+    # To readead()
+    # st.write(string_data)
 
-def query():
-        
-    df = pd.read_csv('addys.csv')
+    # Can be used wherever a "file-like" object is accepted:
+    df = pd.read_csv(uploaded_file).dropna()
     
-    full_addy_list = list(df['address'])
+    st.table(df.Address)
     
-    cnt = 0
-    
-    first_add = ''.join(str(full_addy_list[0]))
-    first_add = first_add.replace(' ', '+')
-    street_endings = ['St','Street','Ave','Avenue','Ln','Lane',
-                      'Circle','Cir','Dr','Drive','Crossing','Xing',
-                      'Blvd','Alley','Trail','Trl','Aly','Cove','CV',
-                      'Boulevard','Causeway','CSWY','CTR','Center',
-                      'Court','CT']
-    
-    url = 'https://www.georgiamls.com/real-estate/search-action.cfm?gtyp=addr&sid=0&styp=sale&address='+first_add+'&scat=1%2C2%2C3'
-    
-    page = r.get(url).text
-    
-    soup = bs(page,'html.parser')
-    
-    address =[]
-    for x in soup.find_all('div',class_='col-xs-12 col-sm-6 col-md-3 text-center listing-gallery'):
-        for y in x.find_all('p')[2]:
-            z = y.text.strip()
-            address.append(z)
-    new_address = str(address[0].replace(' ','-'))+'-'
-    
-    
-    bed_bath = []
-    for x in soup.find_all('div',class_='col-xs-12 col-sm-6 col-md-3 text-center listing-gallery'):
-        for y in x.find_all('p')[1]:
-            z = y.text.strip()
-            bed_bath.append(z)
-    
-    new_bb = str(bed_bath[0].replace('.',''))
-    beds = new_bb.split()[0]
-    baths = new_bb.split()[2]
-    hbath = new_bb.split()[4]
-    
-    mls = []
-    
-    for x in soup.find_all('div',class_='col-xs-12 col-sm-6 col-md-3 text-center listing-gallery'):
-        for y in x.find_all('p')[3]:
-            z = y.text.strip()
-            mls.append(z)
-    
-    real_mls = str(mls[0])
-    real_mls = real_mls.split()[-1]
+    addy_df = pd.DataFrame(df.Address,columns=['Address'])
+
+    addy_df.dropna(inplace=True)
+    address = list(addy_df.Address)
+    print(address)
+    st.write(address)
+    # for street in address:
             
-    city_state_zip = []        
-    for x in soup.find_all('div',class_='col-xs-12 col-sm-6 col-md-3 text-center listing-gallery'):
-            city_state_zip.append(x.find('br').content)
+    cnt = 0 
+
+    dfl = []
+    while cnt < len(address):
+        try:
+            driver = webdriver.Chrome(executable_path = r'./chromedriver')
+            
+            
+            url = 'https://www.gamls.com/'
+            
+            
+            username = 'PETROSIANSAM'
+            password = 'Stanley32!'
+            
+            driver.get(url)
+            
+            driver.find_element("name", "username").send_keys(username)
+            sleep(1)
+            # Find the password input field and send the password to the input field.
+            driver.find_element("name", "password").send_keys(password)
+            sleep(1)
+            
+            driver.find_element("name", "sendLogin").click()
+            
+            WebDriverWait(driver=driver, timeout=10).until(lambda x: x.execute_script("return document.readyState === 'complete'"))
+            error_message = "Incorrect username or password."
+            errors = driver.find_elements(By.CLASS_NAME, "flash-error")
+        
+            # When errors are found, the login will fail. 
+            if any(error_message in e.text for e in errors): 
+                print("[!] Login failed")
+            else:
+                print("[+] Login successful")
+        
+            sleep(3)        
+        
+        
+            
+            for x in address:
+                street_name = x
                 
-    addys = soup.find_all('p', limit=3)[-1]
-    radd = ''.join(addys.find('br').next_siblings)
-    city_state_zip = str(radd.strip())
-    city_state_zip = city_state_zip.replace(',', '')
-    city_state_zip = city_state_zip.replace(' ', '-')
-    
-    token = new_address+city_state_zip+'/'+real_mls
-    
-    new_url = 'https://www.georgiamls.com/'+token
-    
-    p2 = r.get(new_url).text
-    
-    soup2 = bs(p2,'html.parser')
-    # table = soup2.find_all('td',class_='tr-label')
-    
-    dets = []
-    for tr in soup2.select('tr:has(>td:contains("Bed/Bath"))~tr'):
-        for td in tr.select("td"):
-            z = td.text.strip()
-            dets.append(z)
-    
-    
-    labels = dets[::2]
-    info = dets[1::2]
-    subj_df = pd.DataFrame({'labels':labels,'data':info})
-    # ldf.reset_index(inplace=True)
-    schools = str(info[27])
-    schools = schools.replace('\r\n\t\t\t\t\t\t\t\t', ' ')
-    
-    comps = []  
-    for x in soup2.find_all('table',class_='table-condensed'):
-        for y in x.find_all('a'):
-            z = y.text.strip()
-            comps.append(z)
-    comps = [x.replace(' \r\n\t\t\t\t\t\t',',') for x in comps]
-    comps = list(filter(None,comps))
-    
-    links = []
-    for x in soup2.find_all('table',class_='table-condensed'):
-        for y in x.find_all('a' ,href=True):
-            z = y.get('href')
-            links.append(z)
-    links = ['https://www.georgiamls.com'+x for x in links]
-    link_df = pd.DataFrame({'links':links})       
-    link_df.drop_duplicates(inplace=True)
-    new_df = pd.DataFrame()
-    
-    new_df['status'] = subj_df.iloc[0]
-    new_df['rental_list'] = subj_df.iloc[1]
-    new_df['property_type'] = subj_df.iloc[7]
-    new_df['address'] = subj_df.iloc[4]
-    new_df['sqft'] = subj_df.iloc[8]
-    new_df['yoc']= subj_df.iloc[10]
-    new_df['lot_size'] = subj_df.iloc[9]
-    new_df['bsmt'] = subj_df.iloc[15]
-    new_df['water'] = subj_df.iloc[26]
-    new_df['taxes'] = subj_df.iloc[30][1]
-    new_df['beds'] = beds
-    new_df['baths'] = baths
-    new_df['half_baths'] = hbath
-    new_df['schools'] = schools
-    
-    new_df.reset_index(inplace=True)
-    new_df.rename(columns={'index':'label'},inplace=True)
-    new_df = new_df.iloc[1].T
-    
-    comp_df = pd.DataFrame()
-    comp_df['Comp'] = comps
-    comp_df['URL'] = list(link_df.links)
-    return new_df, comp_df
+                n = 2 
+                
+                sname = street_name.split(' ')[n-1]
+                
+                city = street_name.split(',')[1]
+                city = str(city.strip())    
+                
+                url1 = 'https://members.gamls.com/searchv2/?Srch=1&GETLNS=Go&showControls=true&PROPERTYTYPE=Residential&DAYSBACK=any&FP=any&OOM=false&HASPHOTO=1&PROPERTYSUBTYPE_OP=O&QC=true&MLSSTATUS=Sold&CITY='+city+'&PROPERTYSUBTYPE=5803&MINCLOSEDATE=2023%2D01%2D01&PROPERTYCONDITION=any&STREETNAME='+sname+'&MAXCLOSEDATE=2023%2D06%2D04&LOCALSRCH=1'
+                
+                driver.get(url1)
+                sleep(3)
+                driver.find_element('name','GetLNs').click()
+                
+                mls = driver.find_element(By.CLASS_NAME,'me-4').text
+                
+                list_url = 'https://members.gamls.com/listingv2/detail/propertyType/Residential/listingID/'+mls
+                sleep(2)
+                driver.get(list_url)
+                
+                table = driver.find_element(By.TAG_NAME,'tbody').text    
+                
+                ltab = list(table.split('\n')) 
+                ltab.remove('Projected Close:')
+                ltab.remove('Own Condition:')
+                
+                headers = ltab[0::2]
+                deets = ltab[1::2]
+                
+                dedf = pd.DataFrame(deets)
+                
+                # sleep(2)
+                dedf.index = headers 
+                
+                dfl.append(dedf)
+                
+                cnt = cnt+1
+           
+        except:
+            pass
+            cnt = cnt+1
 
-# def near_comps():
-    
-new_df = query()[0]
-comp_df = query()[1]
-print(comp_df)
-comp_df.to_csv('comps.csv')
-headers={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36","Accept-Language":"en-US,en;q=0.9","Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9","Accept-Encoding":"gzip, deflate, br","upgrade-insecure-requests":"1"}
-
-# st.file_uploader('Upload file')
-
-inputForm = st.form("Address Input")
-inputStreet = inputForm.text_input(label='Street',value='5945 Willow Oak Pass')
-inputStreet = inputForm.text_input(label='City',value='Cumming')
-inputStreet = inputForm.text_input(label='State',value='GA',max_chars=2)
-inputStreet = inputForm.text_input(label='Zipcode',value='30040',max_chars=5)
-
-submit_button = inputForm.form_submit_button("Find Value")
-
-if submit_button:
-    st.header('Subject Details')
-    st.table(new_df)
-    st.header('Comp Details')
-    st.table(comp_df)
-
-
+for x in dfl:
+    st.tablex(x)
