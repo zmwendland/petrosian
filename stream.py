@@ -32,9 +32,7 @@ if uploaded_file is not None:
 
     addy_df.dropna(inplace=True)
     address = list(addy_df.Address)
-    print(address)
     st.write(address)
-    # for street in address:
             
     cnt = 0 
 
