@@ -115,5 +115,5 @@ if uploaded_file is not None:
             pass
             cnt = cnt+1
 
-for x in dfl:
-    st.tablex(x)
+    for x in dfl:
+        st.tablex(x)
