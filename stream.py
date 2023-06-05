@@ -6,7 +6,6 @@ Created on Thu Jun  1 19:37:20 2023
 """
 import streamlit as st 
 import pandas as pd
-from io import StringIO
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
